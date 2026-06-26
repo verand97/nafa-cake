@@ -14,14 +14,18 @@ import {
   Croissant,
   Coffee,
   CheckCircle2,
-  UtensilsCrossed,
   ShoppingBag,
   ImagePlus,
   Edit,
   X,
   LogOut,
   Lock,
-  User
+  User,
+  Printer,
+  Download,
+  Store,
+  Upload,
+  Save
 } from 'lucide-react';
 import './App.css';
 
@@ -49,12 +53,7 @@ const getIconForCategory = (category) => {
   return Package;
 };
 
-// Dummy data untuk halaman lain
-const DUMMY_ORDERS = [
-  { id: '#ORD-1023', date: '25 Jun 2026 12:45', customer: 'Umum', total: 120000, status: 'Selesai' },
-  { id: '#ORD-1024', date: '25 Jun 2026 13:10', customer: 'Bapak Budi', total: 340000, status: 'Selesai' },
-  { id: '#ORD-1025', date: '25 Jun 2026 13:30', customer: 'Ibu Siti', total: 75000, status: 'Diproses' },
-];
+
 
 const DUMMY_CUSTOMERS = [
   { id: 'C001', name: 'Bapak Budi', phone: '0812-3456-7890', points: 120 },
@@ -105,14 +104,50 @@ function App() {
     }
     return ['Roti', 'Kue', 'Pastry', 'Minuman'];
   });
+
+  const [orders, setOrders] = useState(() => {
+    const saved = localStorage.getItem('nafa_bakery_orders');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   
+  const [appSettings, setAppSettings] = useState(() => {
+    const saved = localStorage.getItem('nafa_bakery_settings');
+    if (saved) {
+      try { 
+        const parsed = JSON.parse(saved);
+        if (parsed.shopAddress && !parsed.shopAddressStreet) {
+          parsed.shopAddressStreet = parsed.shopAddress;
+          parsed.shopAddressDistrict = '';
+          parsed.shopAddressCity = '';
+        }
+        return parsed; 
+      } catch(e) {}
+    }
+    return {
+      shopName: 'Nafa Bakery',
+      shopAddressStreet: 'Jl. Contoh Desa, RT 01/RW 02',
+      shopAddressDistrict: 'Kecamatan Maju',
+      shopAddressCity: 'Kabupaten Makmur',
+      userName: 'Admin',
+      userAvatar: null
+    };
+  });
+  const [settingsForm, setSettingsForm] = useState(appSettings);
+
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'orders', 'products', 'customers', 'settings'
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [orderType, setOrderType] = useState('Dine In');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [completedOrder, setCompletedOrder] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({ name: '', category: 'Roti', price: '', stock: '', image: null });
@@ -129,6 +164,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem('nafa_bakery_categories', JSON.stringify(categories));
   }, [categories]);
+
+  useEffect(() => {
+    localStorage.setItem('nafa_bakery_orders', JSON.stringify(orders));
+  }, [orders]);
+
+  useEffect(() => {
+    localStorage.setItem('nafa_bakery_settings', JSON.stringify(appSettings));
+  }, [appSettings]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -194,17 +237,43 @@ function App() {
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
+    
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const newOrder = {
+      id: `#ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+      items: [...cart],
+      total: subtotal,
+      date: new Date().toISOString(),
+      customer: 'Umum',
+      status: 'Selesai',
+      cashierName: appSettings.userName,
+      shopName: appSettings.shopName,
+      shopAddress: `${appSettings.shopAddressStreet}, ${appSettings.shopAddressDistrict}, ${appSettings.shopAddressCity}`
+    };
+
+    setCompletedOrder(newOrder);
+    setOrders(prev => [newOrder, ...prev]);
+    
+    // Kurangi stok produk
+    setProducts(prevProducts => prevProducts.map(p => {
+      const cartItem = cart.find(item => item.id === p.id);
+      if (cartItem) {
+        return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
+      }
+      return p;
+    }));
+    
     setShowCheckoutModal(true);
   };
 
   const closeCheckoutAndReset = () => {
     setShowCheckoutModal(false);
     setCart([]);
+    setCompletedOrder(null);
   };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal;
-  const orderId = `#ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
   // Product CRUD Handlers
   const handleImageUpload = (e) => {
@@ -274,6 +343,33 @@ function App() {
     }
   };
 
+  const deleteOrder = (id) => {
+    if(window.confirm('Hapus riwayat pesanan ini?')) {
+      setOrders(prev => prev.filter(o => o.id !== id));
+    }
+  };
+
+  const exportToCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "ID Pesanan,Tanggal,Pelanggan,Total Item,Total Bayar,Status\n";
+    
+    orders.forEach(order => {
+      const dateObj = new Date(order.date);
+      const dateStr = `${dateObj.toLocaleDateString('id-ID')} ${dateObj.toLocaleTimeString('id-ID')}`;
+      const totalItems = order.items ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+      const row = `${order.id},"${dateStr}","${order.customer}",${totalItems},${order.total},${order.status}`;
+      csvContent += row + "\n";
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Rekap_Pesanan_Nafa_Bakery_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Rendering Layout Utama (Dashboard / Kasir)
   const renderDashboard = () => (
     <div className="shop-layout">
@@ -324,24 +420,11 @@ function App() {
         <div className="cart-header">
           <div className="cart-title-row">
             <h2>Pesanan Saat Ini</h2>
-            <span className="format-currency" style={{ color: 'var(--neon-purple)' }}>{orderId}</span>
           </div>
           
-          <div className="order-type-toggle">
-            <button 
-              className={`order-type-btn ${orderType === 'Dine In' ? 'active' : ''}`}
-              onClick={() => setOrderType('Dine In')}
-            >
-              <UtensilsCrossed size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }}/>
-              Makan di Tempat
-            </button>
-            <button 
-              className={`order-type-btn ${orderType === 'Takeaway' ? 'active' : ''}`}
-              onClick={() => setOrderType('Takeaway')}
-            >
-              <ShoppingBag size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }}/>
-              Bawa Pulang
-            </button>
+          <div style={{ backgroundColor: 'var(--charcoal-lighter)', padding: '10px 16px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-primary)', border: '1px dashed var(--border-subtle)' }}>
+            <ShoppingBag size={16} color="var(--lime-green)" />
+            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>Pesanan Siap Dibawa Pulang (Takeaway)</span>
           </div>
         </div>
         
@@ -415,9 +498,14 @@ function App() {
   // Halaman: Pesanan
   const renderOrders = () => (
     <div className="page-container">
-      <div className="page-header">
-        <h2>Riwayat Pesanan</h2>
-        <p>Kelola dan pantau semua transaksi yang telah selesai.</p>
+      <div className="page-header flex-center-between">
+        <div>
+          <h2>Riwayat Pesanan</h2>
+          <p>Kelola dan pantau semua transaksi yang telah selesai.</p>
+        </div>
+        <button className="add-product-btn" onClick={exportToCSV}>
+          <Download size={18} /> Export ke Excel (CSV)
+        </button>
       </div>
       <table className="data-table">
         <thead>
@@ -425,24 +513,48 @@ function App() {
             <th>ID Pesanan</th>
             <th>Tanggal & Waktu</th>
             <th>Pelanggan</th>
+            <th>Total Item</th>
             <th>Total Bayar</th>
             <th>Status</th>
+            <th style={{ textAlign: 'right' }}>Aksi</th>
           </tr>
         </thead>
         <tbody>
-          {DUMMY_ORDERS.map(order => (
-            <tr key={order.id}>
-              <td style={{ fontWeight: 600, color: 'var(--neon-purple)' }}>{order.id}</td>
-              <td>{order.date}</td>
-              <td>{order.customer}</td>
-              <td className="format-currency">{formatRupiah(order.total)}</td>
-              <td>
-                <span className={`status-badge ${order.status === 'Selesai' ? 'success' : 'pending'}`}>
-                  {order.status}
-                </span>
+          {orders.map(order => {
+            const dateObj = new Date(order.date);
+            const totalItems = order.items ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+            return (
+              <tr key={order.id}>
+                <td style={{ fontWeight: 600, color: 'var(--neon-purple)' }}>{order.id}</td>
+                <td>
+                  {dateObj.toLocaleDateString('id-ID')} <br/>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </td>
+                <td>{order.customer}</td>
+                <td>{totalItems} item</td>
+                <td className="format-currency">{formatRupiah(order.total)}</td>
+                <td>
+                  <span className={`status-badge ${order.status === 'Selesai' ? 'success' : 'pending'}`}>
+                    {order.status}
+                  </span>
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <button className="action-btn delete" title="Hapus Riwayat" onClick={() => deleteOrder(order.id)}>
+                    <Trash2 size={18} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+          {orders.length === 0 && (
+            <tr>
+              <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                Belum ada riwayat transaksi.
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>
@@ -543,20 +655,117 @@ function App() {
   );
 
   // Halaman: Pengaturan
+  const handleSettingsSave = (e) => {
+    e.preventDefault();
+    setAppSettings(settingsForm);
+    alert('Pengaturan berhasil disimpan!');
+  };
+
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettingsForm(prev => ({ ...prev, userAvatar: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const renderSettings = () => (
     <div className="page-container">
       <div className="page-header">
         <h2>Pengaturan Sistem</h2>
-        <p>Konfigurasi aplikasi kasir Nafa Bakery.</p>
+        <p>Konfigurasi profil pengguna dan informasi toko Anda.</p>
       </div>
-      <div style={{ backgroundColor: 'var(--charcoal-lighter)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
-        <h3 style={{ marginBottom: '16px', color: 'var(--neon-purple)' }}>Informasi Toko</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}><strong>Nama Toko:</strong> Nafa Bakery</p>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}><strong>Alamat:</strong> Jl. Raya Utama No. 123</p>
+      
+      <form onSubmit={handleSettingsSave} className="settings-grid">
+        <div className="settings-card">
+          <h3><User size={24} /> Profil Kasir</h3>
+          
+          <div className="avatar-upload-section">
+            <div className="avatar-preview">
+              {settingsForm.userAvatar ? (
+                <img src={settingsForm.userAvatar} alt="Preview" />
+              ) : (
+                <User size={32} />
+              )}
+            </div>
+            <div className="avatar-upload-btn">
+              <Upload size={16} /> Unggah Foto
+              <input type="file" accept="image/*" onChange={handleAvatarUpload} />
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label>Nama Kasir / Admin</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={settingsForm.userName} 
+              onChange={e => setSettingsForm({...settingsForm, userName: e.target.value})}
+              required
+            />
+          </div>
+        </div>
         
-        <h3 style={{ marginBottom: '16px', color: 'var(--neon-purple)' }}>Versi Aplikasi</h3>
-        <p style={{ color: 'var(--text-secondary)' }}>Nafa POS v1.0.0 (BETA)</p>
-      </div>
+        <div className="settings-card">
+          <h3><Store size={24} /> Informasi Toko</h3>
+          
+          <div className="form-group">
+            <label>Nama Toko</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={settingsForm.shopName} 
+              onChange={e => setSettingsForm({...settingsForm, shopName: e.target.value})}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Jalan / Desa, RT / RW</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={settingsForm.shopAddressStreet || ''} 
+              onChange={e => setSettingsForm({...settingsForm, shopAddressStreet: e.target.value})}
+              placeholder="Contoh: Jl. Sudirman / Desa Maju RT 01 RW 02"
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Kecamatan</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={settingsForm.shopAddressDistrict || ''} 
+              onChange={e => setSettingsForm({...settingsForm, shopAddressDistrict: e.target.value})}
+              placeholder="Contoh: Kecamatan Sukamaju"
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Kabupaten / Kota</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={settingsForm.shopAddressCity || ''} 
+              onChange={e => setSettingsForm({...settingsForm, shopAddressCity: e.target.value})}
+              placeholder="Contoh: Kabupaten Sejahtera"
+              required
+            />
+          </div>
+          
+          <div style={{ marginTop: '32px' }}>
+            <button type="submit" className="btn-primary" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+              <Save size={18} /> Simpan Pengaturan
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   );
 
@@ -646,7 +855,7 @@ function App() {
         {/* Header Atas */}
         <header className="header">
           <div className="header-title">
-            <h1>Kasir Nafa Bakery</h1>
+            <h1>Kasir {appSettings.shopName}</h1>
             <p>Sistem Manajemen Penjualan</p>
           </div>
           
@@ -667,8 +876,14 @@ function App() {
               <span className="time">{currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
             <div className="user-profile">
-              <div className="avatar">A</div>
-              <span className="user-name">Admin</span>
+              <div className="avatar" style={{ padding: appSettings.userAvatar ? 0 : '', overflow: 'hidden' }}>
+                {appSettings.userAvatar ? (
+                  <img src={appSettings.userAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  appSettings.userName.charAt(0).toUpperCase()
+                )}
+              </div>
+              <span className="user-name">{appSettings.userName}</span>
               <button className="logout-btn" title="Keluar Sistem" onClick={handleLogout}>
                 <LogOut size={16} />
               </button>
@@ -681,17 +896,53 @@ function App() {
       </div>
 
       {/* Checkout Success Modal */}
-      {showCheckoutModal && (
+      {showCheckoutModal && completedOrder && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-icon">
+          <div className="modal-content" style={{ width: '450px' }}>
+            <div className="modal-icon" style={{ marginBottom: '16px' }}>
               <CheckCircle2 size={40} />
             </div>
-            <h2>Pembayaran Berhasil!</h2>
-            <p>Pesanan <strong>{orderId}</strong> sejumlah <strong>{formatRupiah(total)}</strong> telah selesai diproses.</p>
-            <button className="modal-btn" onClick={closeCheckoutAndReset}>
-              Buat Pesanan Baru
-            </button>
+            <h2 style={{ marginBottom: '24px' }}>Pembayaran Berhasil!</h2>
+            
+            <div className="receipt-container">
+              <div className="receipt-header">
+                <h3>{completedOrder.shopName?.toUpperCase() || appSettings.shopName.toUpperCase()}</h3>
+                <p>{completedOrder.shopAddress || appSettings.shopAddress}</p>
+                <p>{new Date(completedOrder.date).toLocaleString('id-ID')}</p>
+                <p>Order ID: <strong>{completedOrder.id}</strong></p>
+                <p>Kasir: {completedOrder.cashierName || appSettings.userName}</p>
+              </div>
+              
+              <div className="receipt-items">
+                {completedOrder.items.map(item => (
+                  <div key={item.id} className="receipt-item">
+                    <div className="receipt-item-name">{item.name}</div>
+                    <div className="receipt-item-qty">{item.quantity}x</div>
+                    <div className="receipt-item-price">{formatRupiah(item.price * item.quantity)}</div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="receipt-divider"></div>
+              
+              <div className="receipt-total">
+                <span>TOTAL</span>
+                <span>{formatRupiah(completedOrder.total)}</span>
+              </div>
+              
+              <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.85rem' }}>
+                Terima kasih atas kunjungan Anda!
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn-print" onClick={() => window.print()}>
+                <Printer size={18} /> Cetak Struk
+              </button>
+              <button className="modal-btn" onClick={closeCheckoutAndReset} style={{ flex: 1 }}>
+                Buat Pesanan Baru
+              </button>
+            </div>
           </div>
         </div>
       )}
