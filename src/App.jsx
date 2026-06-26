@@ -18,7 +18,10 @@ import {
   ShoppingBag,
   ImagePlus,
   Edit,
-  X
+  X,
+  LogOut,
+  Lock,
+  User
 } from 'lucide-react';
 import './App.css';
 
@@ -69,6 +72,12 @@ const formatRupiah = (number) => {
 };
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('nafa_bakery_auth') === 'true';
+  });
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginError, setLoginError] = useState('');
+
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('nafa_bakery_products');
     if (saved) {
@@ -104,6 +113,25 @@ function App() {
   useEffect(() => {
     localStorage.setItem('nafa_bakery_products', JSON.stringify(products));
   }, [products]);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
+      setIsLoggedIn(true);
+      setLoginError('');
+      localStorage.setItem('nafa_bakery_auth', 'true');
+    } else {
+      setLoginError('Username atau password tidak valid!');
+    }
+  };
+
+  const handleLogout = () => {
+    if(window.confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
+      setIsLoggedIn(false);
+      setLoginForm({ username: '', password: '' });
+      localStorage.removeItem('nafa_bakery_auth');
+    }
+  };
 
   const filteredProducts = products.filter(p => {
     const matchesCategory = activeCategory === 'Semua' || p.category === activeCategory;
@@ -533,6 +561,60 @@ function App() {
     }
   };
 
+  // Halaman: Login
+  const renderLogin = () => (
+    <div className="login-container">
+      <div className="login-bg-decoration"></div>
+      <div className="login-bg-decoration-2"></div>
+      
+      <div className="login-card">
+        <div className="login-header">
+          <div className="login-logo">
+            <CakeSlice size={36} />
+          </div>
+          <h1>Nafa Bakery POS</h1>
+          <p>Sistem Manajemen Penjualan Terpadu</p>
+        </div>
+
+        {loginError && (
+          <div className="login-error">
+            {loginError}
+          </div>
+        )}
+
+        <form className="login-form" onSubmit={handleLogin}>
+          <div className="input-with-icon">
+            <User size={20} />
+            <input 
+              type="text" 
+              placeholder="Username" 
+              value={loginForm.username}
+              onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
+              required
+            />
+          </div>
+          <div className="input-with-icon">
+            <Lock size={20} />
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={loginForm.password}
+              onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+              required
+            />
+          </div>
+          <button type="submit" className="login-btn">
+            Masuk ke Sistem
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+
+  if (!isLoggedIn) {
+    return renderLogin();
+  }
+
   return (
     <div className="app-container">
       {/* Sidebar Navigasi */}
@@ -577,6 +659,9 @@ function App() {
             <div className="user-profile">
               <div className="avatar">A</div>
               <span className="user-name">Admin</span>
+              <button className="logout-btn" title="Keluar Sistem" onClick={handleLogout}>
+                <LogOut size={16} />
+              </button>
             </div>
           </div>
         </header>
