@@ -25,7 +25,8 @@ import {
   Download,
   Store,
   Upload,
-  Save
+  Save,
+  Palette
 } from 'lucide-react';
 import './App.css';
 
@@ -136,7 +137,12 @@ function App() {
       shopAddressDistrict: 'Kecamatan Maju',
       shopAddressCity: 'Kabupaten Makmur',
       userName: 'Admin',
-      userAvatar: null
+      userAvatar: null,
+      themeType: 'dark', // dark, light, custom
+      customColorBg: '#1F1F23',
+      customColorPrimary: '#8C66FF',
+      customColorAccent: '#75FB4C',
+      customColorText: '#FFFFFF'
     };
   });
   const [settingsForm, setSettingsForm] = useState(appSettings);
@@ -171,6 +177,46 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('nafa_bakery_settings', JSON.stringify(appSettings));
+    
+    // Terapkan Tema
+    const root = document.documentElement;
+    if (appSettings.themeType === 'dark') {
+      root.style.setProperty('--charcoal', '#1F1F23');
+      root.style.setProperty('--charcoal-lighter', '#2D2D33');
+      root.style.setProperty('--charcoal-darker', '#141417');
+      root.style.setProperty('--neon-purple', '#8C66FF');
+      root.style.setProperty('--lime-green', '#75FB4C');
+      root.style.setProperty('--text-primary', '#FFFFFF');
+      root.style.setProperty('--text-secondary', '#E0E0E0');
+      root.style.setProperty('--text-muted', '#9E9E9E');
+      root.style.setProperty('--border-subtle', 'rgba(255, 255, 255, 0.1)');
+      root.style.setProperty('--surface-hover', 'rgba(140, 102, 255, 0.15)');
+    } else if (appSettings.themeType === 'light') {
+      root.style.setProperty('--charcoal', '#F5F5F5');
+      root.style.setProperty('--charcoal-lighter', '#FFFFFF');
+      root.style.setProperty('--charcoal-darker', '#E0E0E0');
+      root.style.setProperty('--neon-purple', '#6200EA');
+      root.style.setProperty('--lime-green', '#00C853');
+      root.style.setProperty('--text-primary', '#212121');
+      root.style.setProperty('--text-secondary', '#424242');
+      root.style.setProperty('--text-muted', '#757575');
+      root.style.setProperty('--border-subtle', 'rgba(0, 0, 0, 0.1)');
+      root.style.setProperty('--surface-hover', 'rgba(98, 0, 234, 0.08)');
+    } else if (appSettings.themeType === 'custom') {
+      const bg = appSettings.customColorBg || '#1F1F23';
+      const text = appSettings.customColorText || '#FFFFFF';
+      
+      root.style.setProperty('--charcoal', bg);
+      root.style.setProperty('--charcoal-lighter', `color-mix(in srgb, ${bg} 85%, white)`);
+      root.style.setProperty('--charcoal-darker', `color-mix(in srgb, ${bg} 85%, black)`);
+      root.style.setProperty('--neon-purple', appSettings.customColorPrimary || '#8C66FF');
+      root.style.setProperty('--lime-green', appSettings.customColorAccent || '#75FB4C');
+      root.style.setProperty('--text-primary', text);
+      root.style.setProperty('--text-secondary', `color-mix(in srgb, ${text} 80%, ${bg})`);
+      root.style.setProperty('--text-muted', `color-mix(in srgb, ${text} 50%, ${bg})`);
+      root.style.setProperty('--border-subtle', `color-mix(in srgb, ${text} 15%, transparent)`);
+      root.style.setProperty('--surface-hover', `color-mix(in srgb, ${appSettings.customColorPrimary} 15%, transparent)`);
+    }
   }, [appSettings]);
 
   const handleLogin = (e) => {
@@ -758,10 +804,91 @@ function App() {
               required
             />
           </div>
+        </div>
+        
+        <div className="settings-card" style={{ gridColumn: '1 / -1' }}>
+          <h3><Palette size={24} /> Tampilan & Tema</h3>
+          
+          <div className="form-group" style={{ marginBottom: '24px' }}>
+            <label>Pilih Tema</label>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="themeType" 
+                  value="dark" 
+                  checked={settingsForm.themeType === 'dark'} 
+                  onChange={() => setSettingsForm({...settingsForm, themeType: 'dark'})} 
+                />
+                Gelap (Dark Mode)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="themeType" 
+                  value="light" 
+                  checked={settingsForm.themeType === 'light'} 
+                  onChange={() => setSettingsForm({...settingsForm, themeType: 'light'})} 
+                />
+                Terang (Light Mode)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="themeType" 
+                  value="custom" 
+                  checked={settingsForm.themeType === 'custom'} 
+                  onChange={() => setSettingsForm({...settingsForm, themeType: 'custom'})} 
+                />
+                Kustom (Pilih Warna Sendiri)
+              </label>
+            </div>
+          </div>
+
+          {settingsForm.themeType === 'custom' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', background: 'var(--charcoal)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+              <div className="form-group">
+                <label>Background</label>
+                <input 
+                  type="color" 
+                  style={{ width: '100%', height: '40px', cursor: 'pointer', border: 'none', padding: 0 }}
+                  value={settingsForm.customColorBg || '#1F1F23'} 
+                  onChange={e => setSettingsForm({...settingsForm, customColorBg: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Warna Teks</label>
+                <input 
+                  type="color" 
+                  style={{ width: '100%', height: '40px', cursor: 'pointer', border: 'none', padding: 0 }}
+                  value={settingsForm.customColorText || '#FFFFFF'} 
+                  onChange={e => setSettingsForm({...settingsForm, customColorText: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Warna Utama (Aksen 1)</label>
+                <input 
+                  type="color" 
+                  style={{ width: '100%', height: '40px', cursor: 'pointer', border: 'none', padding: 0 }}
+                  value={settingsForm.customColorPrimary || '#8C66FF'} 
+                  onChange={e => setSettingsForm({...settingsForm, customColorPrimary: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Warna Sukses (Aksen 2)</label>
+                <input 
+                  type="color" 
+                  style={{ width: '100%', height: '40px', cursor: 'pointer', border: 'none', padding: 0 }}
+                  value={settingsForm.customColorAccent || '#75FB4C'} 
+                  onChange={e => setSettingsForm({...settingsForm, customColorAccent: e.target.value})}
+                />
+              </div>
+            </div>
+          )}
           
           <div style={{ marginTop: '32px' }}>
             <button type="submit" className="btn-primary" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-              <Save size={18} /> Simpan Pengaturan
+              <Save size={18} /> Simpan Semua Pengaturan
             </button>
           </div>
         </div>
