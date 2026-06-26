@@ -40,7 +40,7 @@ const INITIAL_PRODUCTS = [
   { id: 12, name: 'Pancake Sirup', category: 'Pastry', price: 30000, stock: 15, Icon: CakeSlice, image: null },
 ];
 
-const CATEGORIES = ['Semua', 'Roti', 'Kue', 'Pastry', 'Minuman'];
+
 
 const getIconForCategory = (category) => {
   if (category === 'Pastry') return Croissant;
@@ -93,6 +93,18 @@ function App() {
     }
     return INITIAL_PRODUCTS;
   });
+
+  const [categories, setCategories] = useState(() => {
+    const saved = localStorage.getItem('nafa_bakery_categories');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return ['Roti', 'Kue', 'Pastry', 'Minuman'];
+      }
+    }
+    return ['Roti', 'Kue', 'Pastry', 'Minuman'];
+  });
   
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'orders', 'products', 'customers', 'settings'
   const [activeCategory, setActiveCategory] = useState('Semua');
@@ -113,6 +125,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('nafa_bakery_products', JSON.stringify(products));
   }, [products]);
+
+  useEffect(() => {
+    localStorage.setItem('nafa_bakery_categories', JSON.stringify(categories));
+  }, [categories]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -187,8 +203,7 @@ function App() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.1;
-  const total = subtotal + tax;
+  const total = subtotal;
   const orderId = `#ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
   // Product CRUD Handlers
@@ -265,7 +280,7 @@ function App() {
       {/* Daftar Produk */}
       <div className="product-section">
         <div className="categories-wrapper">
-          {CATEGORIES.map(cat => (
+          {['Semua', ...categories].map(cat => (
             <button 
               key={cat}
               className={`category-btn ${activeCategory === cat ? 'active' : ''}`}
@@ -382,10 +397,6 @@ function App() {
           <div className="summary-row">
             <span>Subtotal</span>
             <span className="format-currency">{formatRupiah(subtotal)}</span>
-          </div>
-          <div className="summary-row">
-            <span>Pajak (10%)</span>
-            <span className="format-currency">{formatRupiah(tax)}</span>
           </div>
           <div className="summary-row total">
             <span>Total Bayar</span>
@@ -541,8 +552,7 @@ function App() {
       <div style={{ backgroundColor: 'var(--charcoal-lighter)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
         <h3 style={{ marginBottom: '16px', color: 'var(--neon-purple)' }}>Informasi Toko</h3>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}><strong>Nama Toko:</strong> Nafa Bakery</p>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}><strong>Alamat:</strong> Jl. Raya Utama No. 123</p>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}><strong>Pajak Default:</strong> 10%</p>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}><strong>Alamat:</strong> Jl. Raya Utama No. 123</p>
         
         <h3 style={{ marginBottom: '16px', color: 'var(--neon-purple)' }}>Versi Aplikasi</h3>
         <p style={{ color: 'var(--text-secondary)' }}>Nafa POS v1.0.0 (BETA)</p>
@@ -730,12 +740,25 @@ function App() {
                   <select 
                     className="form-control" 
                     value={productForm.category}
-                    onChange={(e) => setProductForm({...productForm, category: e.target.value})}
+                    onChange={(e) => {
+                      if (e.target.value === 'ADD_NEW') {
+                        const newCat = window.prompt('Masukkan nama kategori baru:');
+                        if (newCat && newCat.trim() !== '') {
+                          const trimmed = newCat.trim();
+                          if (!categories.includes(trimmed)) {
+                            setCategories(prev => [...prev, trimmed]);
+                          }
+                          setProductForm({...productForm, category: trimmed});
+                        }
+                      } else {
+                        setProductForm({...productForm, category: e.target.value});
+                      }
+                    }}
                   >
-                    <option value="Roti">Roti</option>
-                    <option value="Pastry">Pastry</option>
-                    <option value="Kue">Kue</option>
-                    <option value="Minuman">Minuman</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="ADD_NEW" style={{ fontWeight: 'bold', color: 'var(--neon-purple)' }}>+ Tambah Kategori Baru...</option>
                   </select>
                 </div>
                 <div className="form-group">
