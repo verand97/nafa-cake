@@ -15,26 +15,36 @@ import {
   Coffee,
   CheckCircle2,
   UtensilsCrossed,
-  ShoppingBag
+  ShoppingBag,
+  ImagePlus,
+  Edit,
+  X
 } from 'lucide-react';
 import './App.css';
 
-const PRODUCTS = [
-  { id: 1, name: 'Roti Sourdough', category: 'Roti', price: 35000, stock: 12, Icon: Package },
-  { id: 2, name: 'Baguette Prancis', category: 'Roti', price: 25000, stock: 20, Icon: Package },
-  { id: 3, name: 'Croissant Cokelat', category: 'Pastry', price: 28000, stock: 15, Icon: Croissant },
-  { id: 4, name: 'Croissant Almond', category: 'Pastry', price: 32000, stock: 8, Icon: Croissant },
-  { id: 5, name: 'Cheesecake Stroberi', category: 'Kue', price: 250000, stock: 3, Icon: CakeSlice },
-  { id: 6, name: 'Black Forest', category: 'Kue', price: 280000, stock: 2, Icon: CakeSlice },
-  { id: 7, name: 'Cinnamon Roll', category: 'Pastry', price: 22000, stock: 10, Icon: Croissant },
-  { id: 8, name: 'Matcha Latte', category: 'Minuman', price: 35000, stock: 50, Icon: Coffee },
-  { id: 9, name: 'Kopi Espresso', category: 'Minuman', price: 20000, stock: 100, Icon: Coffee },
-  { id: 10, name: 'Muffin Blueberry', category: 'Pastry', price: 24000, stock: 18, Icon: CakeSlice },
-  { id: 11, name: 'Pretzel Asin', category: 'Roti', price: 18000, stock: 25, Icon: Package },
-  { id: 12, name: 'Pancake Sirup', category: 'Pastry', price: 30000, stock: 15, Icon: CakeSlice },
+const INITIAL_PRODUCTS = [
+  { id: 1, name: 'Roti Sourdough', category: 'Roti', price: 35000, stock: 12, Icon: Package, image: null },
+  { id: 2, name: 'Baguette Prancis', category: 'Roti', price: 25000, stock: 20, Icon: Package, image: null },
+  { id: 3, name: 'Croissant Cokelat', category: 'Pastry', price: 28000, stock: 15, Icon: Croissant, image: null },
+  { id: 4, name: 'Croissant Almond', category: 'Pastry', price: 32000, stock: 8, Icon: Croissant, image: null },
+  { id: 5, name: 'Cheesecake Stroberi', category: 'Kue', price: 250000, stock: 3, Icon: CakeSlice, image: null },
+  { id: 6, name: 'Black Forest', category: 'Kue', price: 280000, stock: 2, Icon: CakeSlice, image: null },
+  { id: 7, name: 'Cinnamon Roll', category: 'Pastry', price: 22000, stock: 10, Icon: Croissant, image: null },
+  { id: 8, name: 'Matcha Latte', category: 'Minuman', price: 35000, stock: 50, Icon: Coffee, image: null },
+  { id: 9, name: 'Kopi Espresso', category: 'Minuman', price: 20000, stock: 100, Icon: Coffee, image: null },
+  { id: 10, name: 'Muffin Blueberry', category: 'Pastry', price: 24000, stock: 18, Icon: CakeSlice, image: null },
+  { id: 11, name: 'Pretzel Asin', category: 'Roti', price: 18000, stock: 25, Icon: Package, image: null },
+  { id: 12, name: 'Pancake Sirup', category: 'Pastry', price: 30000, stock: 15, Icon: CakeSlice, image: null },
 ];
 
 const CATEGORIES = ['Semua', 'Roti', 'Kue', 'Pastry', 'Minuman'];
+
+const getIconForCategory = (category) => {
+  if (category === 'Pastry') return Croissant;
+  if (category === 'Kue') return CakeSlice;
+  if (category === 'Minuman') return Coffee;
+  return Package;
+};
 
 // Dummy data untuk halaman lain
 const DUMMY_ORDERS = [
@@ -59,6 +69,22 @@ const formatRupiah = (number) => {
 };
 
 function App() {
+  const [products, setProducts] = useState(() => {
+    const saved = localStorage.getItem('nafa_bakery_products');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map(p => ({
+          ...p,
+          Icon: getIconForCategory(p.category)
+        }));
+      } catch (e) {
+        return INITIAL_PRODUCTS;
+      }
+    }
+    return INITIAL_PRODUCTS;
+  });
+  
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'orders', 'products', 'customers', 'settings'
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,15 +92,27 @@ function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [orderType, setOrderType] = useState('Dine In');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState({ name: '', category: 'Roti', price: '', stock: '', image: null });
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const filteredProducts = PRODUCTS.filter(p => {
+  useEffect(() => {
+    localStorage.setItem('nafa_bakery_products', JSON.stringify(products));
+  }, [products]);
+
+  const filteredProducts = products.filter(p => {
     const matchesCategory = activeCategory === 'Semua' || p.category === activeCategory;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Hapus spasi untuk pencarian yang lebih fleksibel (misal "Hu Tao" tetap ketemu kalau dicari "hutao")
+    const normalizedName = p.name.toLowerCase().replace(/\s+/g, '');
+    const normalizedSearch = searchQuery.toLowerCase().replace(/\s+/g, '');
+    const matchesSearch = normalizedName.includes(normalizedSearch);
+    
     return matchesCategory && matchesSearch;
   });
 
@@ -125,6 +163,74 @@ function App() {
   const total = subtotal + tax;
   const orderId = `#ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  // Product CRUD Handlers
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProductForm(prev => ({ ...prev, image: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const openProductModal = (product = null) => {
+    if (product) {
+      setEditingProduct(product);
+      setProductForm({
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        stock: product.stock,
+        image: product.image
+      });
+    } else {
+      setEditingProduct(null);
+      setProductForm({ name: '', category: 'Roti', price: '', stock: '', image: null });
+    }
+    setShowProductModal(true);
+  };
+
+  const closeProductModal = () => {
+    setShowProductModal(false);
+    setEditingProduct(null);
+  };
+
+  const saveProduct = (e) => {
+    e.preventDefault();
+    if (!productForm.name || !productForm.price || !productForm.stock) return;
+
+    // Determine default icon based on category if no image is uploaded
+    let defaultIcon = getIconForCategory(productForm.category);
+
+    if (editingProduct) {
+      setProducts(prev => prev.map(p => 
+        p.id === editingProduct.id 
+          ? { ...p, ...productForm, price: parseInt(productForm.price), stock: parseInt(productForm.stock), Icon: defaultIcon }
+          : p
+      ));
+    } else {
+      const newProduct = {
+        id: Date.now(),
+        ...productForm,
+        price: parseInt(productForm.price),
+        stock: parseInt(productForm.stock),
+        Icon: defaultIcon
+      };
+      setProducts(prev => [...prev, newProduct]);
+    }
+    closeProductModal();
+  };
+
+  const deleteProduct = (id) => {
+    if(window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+      setProducts(prev => prev.filter(p => p.id !== id));
+      // Remove from cart if it's there
+      setCart(prev => prev.filter(item => item.id !== id));
+    }
+  };
+
   // Rendering Layout Utama (Dashboard / Kasir)
   const renderDashboard = () => (
     <div className="shop-layout">
@@ -147,8 +253,12 @@ function App() {
             const IconComponent = product.Icon;
             return (
               <div key={product.id} className="product-card" onClick={() => addToCart(product)}>
-                <div className="product-icon-container">
-                  <IconComponent size={64} strokeWidth={1.5} />
+                <div className="product-icon-container" style={{ padding: product.image ? '0' : '16px', overflow: 'hidden' }}>
+                  {product.image ? (
+                    <img src={product.image} alt={product.name} className="product-image-large" />
+                  ) : (
+                    <IconComponent size={64} strokeWidth={1.5} />
+                  )}
                 </div>
                 <div className="product-info">
                   <div className="product-name">{product.name}</div>
@@ -203,8 +313,12 @@ function App() {
               const IconComponent = item.Icon;
               return (
                 <div key={item.id} className="cart-item">
-                  <div className="cart-item-icon">
-                    <IconComponent size={24} />
+                  <div className="cart-item-icon" style={{ padding: item.image ? '0' : '12px', overflow: 'hidden' }}>
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="product-image-large" />
+                    ) : (
+                      <IconComponent size={24} />
+                    )}
                   </div>
                   <div className="cart-item-details">
                     <div className="cart-item-name" title={item.name}>{item.name}</div>
@@ -298,30 +412,62 @@ function App() {
   // Halaman: Inventaris Produk
   const renderProducts = () => (
     <div className="page-container">
-      <div className="page-header">
-        <h2>Inventaris Produk</h2>
-        <p>Kelola ketersediaan stok dan harga produk Anda.</p>
+      <div className="page-header flex-center-between">
+        <div>
+          <h2>Inventaris Produk</h2>
+          <p>Kelola ketersediaan stok dan harga produk Anda.</p>
+        </div>
+        <button className="add-product-btn" onClick={() => openProductModal()}>
+          <Plus size={18} /> Tambah Produk
+        </button>
       </div>
       <table className="data-table">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Nama Produk</th>
+            <th>Produk</th>
             <th>Kategori</th>
             <th>Harga</th>
-            <th>Stok Tersisa</th>
+            <th>Stok</th>
+            <th style={{ textAlign: 'right' }}>Aksi</th>
           </tr>
         </thead>
         <tbody>
-          {PRODUCTS.map(product => (
+          {products.map(product => {
+            const IconComponent = product.Icon;
+            return (
             <tr key={product.id}>
-              <td>PRD-{product.id.toString().padStart(3, '0')}</td>
-              <td style={{ fontWeight: 600 }}>{product.name}</td>
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {product.image ? (
+                    <img src={product.image} alt={product.name} className="product-image-small" />
+                  ) : (
+                    <div className="product-icon-small">
+                      <IconComponent size={20} />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: 600 }}>{product.name}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>PRD-{product.id.toString().substring(0,4)}</span>
+                  </div>
+                </div>
+              </td>
               <td>{product.category}</td>
               <td className="format-currency">{formatRupiah(product.price)}</td>
-              <td>{product.stock}</td>
+              <td>
+                <span className={`status-badge ${product.stock <= 5 ? 'pending' : 'success'}`}>
+                  {product.stock} Tersisa
+                </span>
+              </td>
+              <td style={{ textAlign: 'right' }}>
+                <button className="action-btn" title="Edit Produk" onClick={() => openProductModal(product)}>
+                  <Edit size={18} />
+                </button>
+                <button className="action-btn delete" title="Hapus Produk" onClick={() => deleteProduct(product.id)}>
+                  <Trash2 size={18} />
+                </button>
+              </td>
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
     </div>
@@ -451,6 +597,96 @@ function App() {
             <button className="modal-btn" onClick={closeCheckoutAndReset}>
               Buat Pesanan Baru
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Product CRUD Modal */}
+      {showProductModal && (
+        <div className="modal-overlay">
+          <div className="form-modal-content">
+            <div className="form-header">
+              <h2>{editingProduct ? 'Edit Produk' : 'Tambah Produk Baru'}</h2>
+              <button className="close-btn" onClick={closeProductModal}>
+                <X size={24} />
+              </button>
+            </div>
+            <form onSubmit={saveProduct}>
+              <div className="form-group">
+                <label>Gambar Produk (Opsional)</label>
+                <div className="image-upload-container">
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="file-input" />
+                  {productForm.image ? (
+                    <img src={productForm.image} alt="Preview" className="image-preview" />
+                  ) : (
+                    <div className="upload-placeholder">
+                      <ImagePlus size={32} />
+                      <span>Klik untuk unggah gambar</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Nama Produk</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="Mis. Croissant Original" 
+                  value={productForm.name} 
+                  onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Kategori</label>
+                  <select 
+                    className="form-control" 
+                    value={productForm.category}
+                    onChange={(e) => setProductForm({...productForm, category: e.target.value})}
+                  >
+                    <option value="Roti">Roti</option>
+                    <option value="Pastry">Pastry</option>
+                    <option value="Kue">Kue</option>
+                    <option value="Minuman">Minuman</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Stok Awal</label>
+                  <input 
+                    type="number" 
+                    className="form-control" 
+                    placeholder="Mis. 20" 
+                    min="0"
+                    value={productForm.stock} 
+                    onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Harga (Rp)</label>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  placeholder="Mis. 25000" 
+                  min="0"
+                  value={productForm.price} 
+                  onChange={(e) => setProductForm({...productForm, price: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn-secondary" onClick={closeProductModal}>Batal</button>
+                <button type="submit" className="btn-primary">
+                  {editingProduct ? 'Simpan Perubahan' : 'Tambah Produk'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
